@@ -30,7 +30,6 @@ struct EnemyStats {
 	// int actionPoints = -1;// Assuming '行动' is action points/energy
 };
 
-
 // 函数：打印上一个 Windows API 调用的错误信息
 void PrintLastError() {
 	DWORD errorMessageID = GetLastError();
