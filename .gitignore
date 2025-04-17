@@ -1,32 +1,62 @@
-# Prerequisites
-*.d
+# Visual Studio 的构建输出和临时文件
+Debug/
+Release/
+x64/
+ipch/
+.vs/
+*.vcxproj.filters
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# CMake 构建目录 (如果使用 CMake)
+build/
+CMakeCache.txt
+CMakeFiles/
 
-# Precompiled Headers
-*.gch
-*.pch
+# Qt 构建目录 (如果使用 Qt)
+*.user
+*.pro.user
+ui_*.h
+moc_*.cpp
+rcc_*.cpp
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# Makefile 构建目录 (如果使用 Makefile)
+obj/
+bin/
 
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
+# 可执行文件
 *.exe
 *.out
 *.app
+
+# 库文件
+*.lib
+*.dll
+*.so
+*.dylib
+*.pdb # Program Database 文件 (通常包含调试信息，不建议上传到公共仓库)
+
+# 对象文件
+*.obj
+*.o
+
+# 预编译头文件
+*.pch
+
+# 资源文件编译后的文件
+*.res
+
+# Visual Studio Code 相关
+.vscode/
+
+# CLion 相关
+.idea/
+
+# 其他编辑器或 IDE 的临时文件/目录 (请根据你的使用情况添加)
+# 例如：
+# *.swp # Vim swap 文件
+# *~ # Emacs 备份文件
+
+# 操作系统特定的临时文件
+Thumbs.db
+.DS_Store
+
+# 如果你的项目中有其他需要忽略的特定文件或目录，请在这里添加
