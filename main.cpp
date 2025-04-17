@@ -18,6 +18,18 @@ struct PlayerStats {
 	int actionPoints = -1;
 };
 
+struct CombatStats {
+	int maxHP = -1;
+	int currentHP = -1;
+	int actionPoints = -1;// Assuming '行动' is action points/energy
+};
+
+struct EnemyStats {
+	int maxHP = -1;
+	int currentHP = -1;
+	// int actionPoints = -1;// Assuming '行动' is action points/energy
+};
+
 
 // 函数：打印上一个 Windows API 调用的错误信息
 void PrintLastError() {
@@ -168,6 +180,132 @@ bool getPlayerStats(HANDLE& process, uintptr_t gameAssemblyBase, PlayerStats& st
 	return true;
 }
 
+// 函数：获取玩家所有状态信息
+bool getPlayerCombatStats(HANDLE& process, uintptr_t gameAssemblyBase, CombatStats& stats) {
+	// 根据 CE 图片的指针链:
+	// "GameAssembly.dll"+01984A60 -> +B8 -> +0 -> +208 -> +20 -> +30 -> baseAddrForStats
+	uintptr_t basePtrAddr = gameAssemblyBase + 0x01984A60;
+	uintptr_t currentAddr = 0; // 这将是进行最后偏移计算的基础地址
+
+	// --- 指针链遍历 ---
+	if (!ReadPointerValue(process, basePtrAddr, currentAddr)) {
+		std::cerr << "错误：读取基指针失败 (GameAssembly.dll + 0x" << std::hex << 0x019CDBA8 << ")" << std::endl; return false;
+	}
+	currentAddr += 0xB8;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x170 失败" << std::endl; return false;
+	}
+	currentAddr += 0x0;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x28 失败" << std::endl; return false;
+	}
+	currentAddr += 0x208;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x18 失败" << std::endl; return false;
+	}
+	currentAddr += 0x20;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) { // 读取最后一个指针，得到基地址
+		std::cerr << "错误：读取指针链偏移 +0x30 失败（获取最终偏移基础地址失败）。" << std::endl; return false;
+	}
+	currentAddr += 0x30;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) { // 读取最后一个指针，得到基地址
+		std::cerr << "错误：读取指针链偏移 +0x30 失败（获取最终偏移基础地址失败）。" << std::endl; return false;
+	}
+	// --- 指针链遍历结束 ---
+
+	// currentAddr 现在是应用最终偏移量的基础地址 (即上面分析中的 Address5)
+	uintptr_t finalAddr = 0;
+	SIZE_T bytesRead = 0;
+	bool all_success = true; // 追踪是否所有读取都成功
+
+	// 读取各个属性值 (使用临时变量以防结构体未完全填充)
+	int tempVal;
+
+	// 血上限 (Max HP): 最终偏移 0x18
+	finalAddr = currentAddr + 0xB8;
+	if (ReadProcessMemory(process, (LPCVOID)finalAddr, &tempVal, sizeof(int), &bytesRead) && bytesRead == sizeof(int)) { stats.maxHP = tempVal; }
+	else { std::cerr << "读取 Max HP 失败 (偏移 0x18), 地址: 0x" << std::hex << finalAddr << std::endl; all_success = false; stats.maxHP = -1; }
+
+	// 血量 (Current HP): 最终偏移 0x1C
+	finalAddr = currentAddr + 0xBC;
+	if (ReadProcessMemory(process, (LPCVOID)finalAddr, &tempVal, sizeof(int), &bytesRead) && bytesRead == sizeof(int)) { stats.currentHP = tempVal; }
+	else { std::cerr << "读取 Current HP 失败 (偏移 0x1C), 地址: 0x" << std::hex << finalAddr << std::endl; all_success = false; stats.currentHP = -1; }
+
+	// 行动 (Actions): 最终偏移 0x38
+	finalAddr = currentAddr + 0xCC;
+	if (ReadProcessMemory(process, (LPCVOID)finalAddr, &tempVal, sizeof(int), &bytesRead) && bytesRead == sizeof(int)) { stats.actionPoints = tempVal; }
+	else { std::cerr << "读取 Action Points 失败 (偏移 0x38), 地址: 0x" << std::hex << finalAddr << std::endl; all_success = false; stats.actionPoints = -1; }
+
+	// 如果有任何一次读取失败，打印最后的系统错误码
+	if (!all_success) {
+		PrintLastError();
+	}
+
+	// 即使部分失败，也返回 true，让 main 函数可以打印已成功读取的部分
+	// 如果要求必须全部成功才算成功，则返回 all_success
+	return true;
+}
+
+// 函数：获取敌方状态信息
+bool getEnemyStats(HANDLE& process, uintptr_t gameAssemblyBase, EnemyStats& stats) {
+	// 根据 CE 图片的指针链:
+	// "GameAssembly.dll"+01984278 -> +B8 -> +8 -> +48 -> +18 -> +30 -> baseAddrForStats
+	uintptr_t basePtrAddr = gameAssemblyBase + 0x01984278;
+	uintptr_t currentAddr = 0; // 这将是进行最后偏移计算的基础地址
+
+	// --- 指针链遍历 ---
+	if (!ReadPointerValue(process, basePtrAddr, currentAddr)) {
+		std::cerr << "错误：读取基指针失败 (GameAssembly.dll + 0x" << std::hex << 0x019CDBA8 << ")" << std::endl; return false;
+	}
+	currentAddr += 0xB8;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x170 失败" << std::endl; return false;
+	}
+	currentAddr += 0x8;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x28 失败" << std::endl; return false;
+	}
+	currentAddr += 0x48;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) {
+		std::cerr << "错误：读取指针链偏移 +0x18 失败" << std::endl; return false;
+	}
+	currentAddr += 0x18;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) { // 读取最后一个指针，得到基地址
+		std::cerr << "错误：读取指针链偏移 +0x30 失败（获取最终偏移基础地址失败）。" << std::endl; return false;
+	}
+	currentAddr += 0x30;
+	if (!ReadPointerValue(process, currentAddr, currentAddr)) { // 读取最后一个指针，得到基地址
+		std::cerr << "错误：读取指针链偏移 +0x30 失败（获取最终偏移基础地址失败）。" << std::endl; return false;
+	}
+	// --- 指针链遍历结束 ---
+
+	// currentAddr 现在是应用最终偏移量的基础地址 (即上面分析中的 Address5)
+	uintptr_t finalAddr = 0;
+	SIZE_T bytesRead = 0;
+	bool all_success = true; // 追踪是否所有读取都成功
+
+	// 读取各个属性值 (使用临时变量以防结构体未完全填充)
+	int tempVal;
+
+	// 血上限 (Max HP): 最终偏移 0x18
+	finalAddr = currentAddr + 0xB8;
+	if (ReadProcessMemory(process, (LPCVOID)finalAddr, &tempVal, sizeof(int), &bytesRead) && bytesRead == sizeof(int)) { stats.maxHP = tempVal; }
+	else { std::cerr << "读取 Max HP 失败 (偏移 0x18), 地址: 0x" << std::hex << finalAddr << std::endl; all_success = false; stats.maxHP = -1; }
+
+	// 血量 (Current HP): 最终偏移 0x1C
+	finalAddr = currentAddr + 0xBC;
+	if (ReadProcessMemory(process, (LPCVOID)finalAddr, &tempVal, sizeof(int), &bytesRead) && bytesRead == sizeof(int)) { stats.currentHP = tempVal; }
+	else { std::cerr << "读取 Current HP 失败 (偏移 0x1C), 地址: 0x" << std::hex << finalAddr << std::endl; all_success = false; stats.currentHP = -1; }
+
+	// 如果有任何一次读取失败，打印最后的系统错误码
+	if (!all_success) {
+		PrintLastError();
+	}
+
+	// 即使部分失败，也返回 true，让 main 函数可以打印已成功读取的部分
+	// 如果要求必须全部成功才算成功，则返回 all_success
+	return true;
+}
 
 int main()
 {
@@ -219,6 +357,8 @@ int main()
 
 	if (process != NULL) {
 		PlayerStats currentStats;
+		CombatStats currentCombatStats;
+		EnemyStats currentEnemyStats;
 
 		while (true) {
 			DWORD exitCode;
@@ -244,7 +384,31 @@ int main()
 				// gameAssemblyBase = GetModuleBaseAddress(pid, moduleName); // 尝试重新获取基址
 				// Sleep(1000);
 			}
-			Sleep(2000); // 每 2 秒读取一次
+			if (getPlayerCombatStats(process, gameAssemblyBase, currentCombatStats)) {
+				std::cout << "\n------ 战斗状态 (" << std::dec << GetTickCount() << ") ------" << std::endl; // 加个时间戳
+				std::cout << "血量:       " << std::dec << currentCombatStats.currentHP << "/" << currentCombatStats.maxHP << std::endl;
+				std::cout << "行动点:     " << std::dec << currentCombatStats.actionPoints << std::endl;
+				std::cout << "-----------------------------\n" << std::endl;
+			}
+			else {
+				std::cout << "读取战斗状态失败。" << std::endl;
+				// 如果 getPlayerCombatStats 返回 false，可能需要重新获取基址或退出
+				// gameAssemblyBase = GetModuleBaseAddress(pid, moduleName); // 尝试重新获取基址
+				// Sleep(1000);
+			}
+			if (getEnemyStats(process, gameAssemblyBase, currentEnemyStats)) {
+				std::cout << "\n------ 敌人状态 (" << std::dec << GetTickCount() << ") ------" << std::endl; // 加个时间戳
+				std::cout << "血量:       " << std::dec << currentEnemyStats.currentHP << "/" << currentEnemyStats.maxHP << std::endl;
+				std::cout << "-----------------------------\n" << std::endl;
+			}
+			else {
+				std::cout << "读取敌人状态失败。" << std::endl;
+				// 如果 getEnemyStats 返回 false，可能需要重新获取基址或退出
+				// gameAssemblyBase = GetModuleBaseAddress(pid, moduleName); // 尝试重新获取基址
+				// Sleep(1000);
+				// Sleep(2000); // 每 2 秒读取一次
+			}
+			Sleep(1000);
 		}
 		CloseHandle(process);
 	}
